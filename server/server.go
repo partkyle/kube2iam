@@ -15,12 +15,9 @@ import (
 	"github.com/cenk/backoff"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/tools/cache"
 
-	"github.com/jtblin/kube2iam"
+	mappings "github.com/jtblin/kube2iam/chefmappings"
 	"github.com/jtblin/kube2iam/iam"
-	"github.com/jtblin/kube2iam/k8s"
-	"github.com/jtblin/kube2iam/mappings"
 )
 
 const (
@@ -60,7 +57,6 @@ type Server struct {
 	Verbose                 bool
 	Version                 bool
 	iam                     *iam.Client
-	k8s                     *k8s.Client
 	roleMapper              *mappings.RoleMapper
 	BackoffMaxElapsedTime   time.Duration
 	BackoffMaxInterval      time.Duration
@@ -183,14 +179,14 @@ func (s *Server) healthHandler(logger *log.Entry, w http.ResponseWriter, r *http
 }
 
 func (s *Server) debugStoreHandler(logger *log.Entry, w http.ResponseWriter, r *http.Request) {
-	o, err := json.Marshal(s.roleMapper.DumpDebugInfo())
-	if err != nil {
-		log.Errorf("Error converting debug map to json: %+v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// o, err := json.Marshal(s.roleMapper.DumpDebugInfo())
+	// if err != nil {
+	// 	log.Errorf("Error converting debug map to json: %+v", err)
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
 
-	write(logger, w, string(o))
+	// write(logger, w, string(o))
 }
 
 func (s *Server) securityCredentialsHandler(logger *log.Entry, w http.ResponseWriter, r *http.Request) {
@@ -223,7 +219,6 @@ func (s *Server) roleHandler(logger *log.Entry, w http.ResponseWriter, r *http.R
 
 	roleLogger := logger.WithFields(log.Fields{
 		"pod.iam.role": roleMapping.Role,
-		"ns.name":      roleMapping.Namespace,
 	})
 
 	wantedRole := mux.Vars(r)["role"]
@@ -263,26 +258,26 @@ func write(logger *log.Entry, w http.ResponseWriter, s string) {
 
 // Run runs the specified Server.
 func (s *Server) Run(host, token, nodeName string, insecure bool) error {
-	k, err := k8s.NewClient(host, token, nodeName, insecure)
-	if err != nil {
-		return err
-	}
-	s.k8s = k
+	// k, err := k8s.NewClient(host, token, nodeName, insecure)
+	// if err != nil {
+	// 	return err
+	// }
+	// s.k8s = k
 	s.iam = iam.NewClient(s.BaseRoleARN)
-	s.roleMapper = mappings.NewRoleMapper(s.IAMRoleKey, s.DefaultIAMRole, s.NamespaceRestriction, s.NamespaceKey, s.iam, s.k8s)
-	podSynched := s.k8s.WatchForPods(kube2iam.NewPodHandler(s.IAMRoleKey))
-	namespaceSynched := s.k8s.WatchForNamespaces(kube2iam.NewNamespaceHandler(s.NamespaceKey))
+	s.roleMapper = mappings.NewRoleMapper(s.DefaultIAMRole, s.iam)
+	// podSynched := s.k8s.WatchForPods(kube2iam.NewPodHandler(s.IAMRoleKey))
+	// namespaceSynched := s.k8s.WatchForNamespaces(kube2iam.NewNamespaceHandler(s.NamespaceKey))
 
-	synced := false
-	for i := 0; i < defaultCacheSyncAttempts && !synced; i++ {
-		synced = cache.WaitForCacheSync(nil, podSynched, namespaceSynched)
-	}
+	// synced := false
+	// for i := 0; i < defaultCacheSyncAttempts && !synced; i++ {
+	// 	synced = cache.WaitForCacheSync(nil, podSynched, namespaceSynched)
+	// }
 
-	if !synced {
-		log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", defaultCacheSyncAttempts)
-	} else {
-		log.Debugln("Caches have been synced.  Proceeding with server.")
-	}
+	// if !synced {
+	// 	log.Fatalf("Attempted to wait for caches to be synced for %d however it is not done.  Giving up.", defaultCacheSyncAttempts)
+	// } else {
+	// 	log.Debugln("Caches have been synced.  Proceeding with server.")
+	// }
 
 	r := mux.NewRouter()
 
